@@ -10,7 +10,7 @@ close all
 
 %%
 SRadius = 8;   % The minimum droplet/microsphere radius (in pixels) the script will seek out (and recognize)
-LRadius = 16;   % The maximum droplet/microsphere radius (in pixels) the script will seek out (and recognize)
+LRadius = 14;   % The maximum droplet/microsphere radius (in pixels) the script will seek out (and recognize)
 %Generally you want to know relative pixel size, if your radius range is
 %too big accuracy for the script goes down. However, if you do not know the
 %approximate pixel size, try a run from 10 to 1000 and identify approximate
@@ -21,21 +21,11 @@ LRadius = 16;   % The maximum droplet/microsphere radius (in pixels) the script 
 % Figure out how to get rid of manual radii 
 
 % 0.91
-SensitivityFactor = 0.95;   % The sensitivity of the circle-hunting command.  Lower values will 
+SensitivityFactor = 0.94;   % The sensitivity of the circle-hunting command.  Lower values will 
                             % lead the script to be more selective, while higher values will 
                             % lead to it being less selective.
 
 
-
-%%%%% DO NOT CHANGE BELOW THIS %%%%%
-%Isolating the data for your analysis later on
-
-red = B(:,:,1); % Red channel data
-green = B(:,:,2); % Green channel data
-blue = B(:,:,3); % Blue channel data
-a = zeros(size(B, 1), size(B, 2)); % Makes an all zero matrix to blot out channels that are not of interest, i.e they become 0
-
-%%%%% DO NOT CHANGE ABOVE THIS %%%%%
 
 
 %% TODO %% 
@@ -69,15 +59,14 @@ end
 % Analyze
 % radiiBright = zeros(10000000, 1)
 
-
-radiiBright = 0;
 imgs = fullfile(path,file);
 
-% If there is only one image
-if class(imgs) ~= 'cell'
+% Checking if it is one or more images
+if ischar(imgs(1))
     imgs = {imgs};
 end
 
+radiiBright = 0;
 % Reads all of the files in the new directory
 for k = 1:length(imgs)
     % fprintf(1, 'Now reading %s\n', fullFileName);
@@ -88,13 +77,17 @@ for k = 1:length(imgs)
     B = RawImage; % This is all your information for analysis
     LofI = length(B); % Determining the length of the matrix, to know dimensions (normally all images are squares so one dimension is fine)
     %%
+    red = B(:,:,1); % Red channel data
+    green = B(:,:,2); % Green channel data
+    blue = B(:,:,3); % Blue channel data
+    a = zeros(size(B, 1), size(B, 2)); % Makes an all zero matrix to blot out channels that are not of interest, i.e they become 0
 
     %%
     %Producing matrices that are only composed of a single channel's worth of data
     
     just_red = cat(3, red, a, a);     % Creates a new set of data only composed of red channel data
-    just_green = cat(3, a, green, a); % Creates a new set of data only composed of green channel data
-    just_blue = cat(3, a, a, blue);  % Creates a new set of data only composed of blue channel data
+    % just_green = cat(3, a, green, a); % Creates a new set of data only composed of green channel data
+    % just_blue = cat(3, a, a, blue);  % Creates a new set of data only composed of blue channel data
     back_to_original_img = cat(3, red, green, blue); %Back to your original image such that you can evaluate
     
     %Preparing image analysis and output
@@ -107,6 +100,7 @@ for k = 1:length(imgs)
     radiiBright = [radiiBright; tempRadiiBright];
     % TODO 
     % Updated plots between the time points
+    % TODO
     
     
     if k == length(imgs) % Show the last image to reduce redundancy
@@ -116,12 +110,13 @@ for k = 1:length(imgs)
 end
     
 % The value inside of the parentheses below is the um / pixels
-DiaBrightAdj = radiiBright*(1100/410)*2; %Gives you diameter of the beads/droplets... NEED TO MAKE SURE CORRECT MULTIPLIER IS USED  
+DiaBrightAdj = radiiBright*(1100/410)*2; % Gives you diameter of the beads/droplets... NEED TO MAKE SURE CORRECT MULTIPLIER IS USED  
+
 figure,histogram(DiaBrightAdj) % Gives you a histogram of the data
 title('Droplet size distribution','FontSize', 14) % title of your plot
 xlabel('Diameter (um)', 'FontSize', 14) % x-axis label of your plot
 ylabel('Number of beads', 'FontSize', 14) % y-axis label of your plot 
-% countDia = size(DiaBrightAdj,1); %Data that may be useful to have present
+countDia = size(DiaBrightAdj,1); %Data that may be useful to have present
 DiaMean = mean(DiaBrightAdj);    %Data that may be useful to have present
 DiaSTD = std(DiaBrightAdj);      %Data that may be useful to have present
 
@@ -228,23 +223,3 @@ annotation('textbox',dim,'String',str,'FitBoxToText','on');
 % str = compose(DataInfo, A);
 % dim = [0.55 0.6 0.3 0.3];
 % annotation('textbox',dim,'String',str,'FitBoxToText','on');
-
-%% Just starting point for myself
-% fwrite(radiiBright)%
-% 
-% SensitivityFactor = 0.92;   % The sensitivity of the circle-hunting command.  Lower values will 
-%                             % lead the script to be more selective, while higher values will 
-%                             % lead to it being less selective.
-% 
-% RawImage = imread('Droplets_TEMP\4min-3.jpg');  % Change value to the filename you want to analyze
-% 
-% figure, imshow(RawImage)
-% 
-% B = RawImage;
-% 
-% L = bwlabel(B);
-% s = regionprops(L, 'PixelIdxList', 'PixelList', 'Area', 'Centroid', 'FilledArea');
-% 
-% figure, imshow(RawImage)
-% [centersBright, radiiBright] = imfindcircles(B,[SRadius LRadius],'ObjectPolarity','dark','Sensitivity',SensitivityFactor);
-% viscircles(centersBright, radiiBright,'EdgeColor','b');

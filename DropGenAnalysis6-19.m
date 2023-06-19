@@ -32,9 +32,9 @@ SensitivityFactor = 0.94;   % The sensitivity of the circle-hunting command.  Lo
 % Change the senstivity factors and then make the average size of the
 % particles
 %% TODO %%
-
+tic
 %%%%% START KODY's CHANGES %%%%%%
-startingFolder = 'C:\Program Files\MATLAB';
+startingFolder = 'C:\Program Files\MATLAB'; % Might have issues for windows
 if ~exist(startingFolder, 'dir')
   % If that folder doesn't exist, just start in the current folder.
   startingFolder = pwd;
@@ -67,20 +67,22 @@ if ischar(imgs(1))
     file = {file};
 end
 
-% TODO
 % Create an output file and then clear it if it already exists
 folderPath = fullfile(pwd, 'Output-Data');
 if exist(folderPath, 'dir')
     rmdir(folderPath, 's');
 end
 mkdir(folderPath);
-cd(folderPath); % This might be unnecessary?
 
 
-radiiBright = 0;
+
 % radiiBright = zeros(1000000,1);
 % Preallocate and then with the counter from the temp, at the end resize
 % the radiibright -= the total number of circles found
+maxCircles = 10000000;
+radiiBright = zeros(maxCircles, 1); % Preallocation
+circleCount = 0;
+figCounter = 1;
 
 % Reads all of the files in the new directory
 for k = 1:length(imgs)
@@ -112,12 +114,29 @@ for k = 1:length(imgs)
     
     [centersBright, tempRadiiBright] = imfindcircles(just_red,[SRadius LRadius],'ObjectPolarity','bright','Sensitivity',SensitivityFactor);%Algorithm that identifies the circles
     
-    % TODO 
-    % With preallocation, instead of adding to the end of the array have it
-    % just index into the section
-    % Could hold the current index of the latest value and then replace it with the tempRadiibright and then add the latest value
-    radiiBright = [radiiBright; tempRadiiBright];
     
+    % radiiBright = [radiiBright; tempRadiiBright]; % before changes
+
+    % New circle count
+    circleCountNew = circleCount + size(tempRadiiBright, 1);
+    
+    % Check if the number of circles exceeds the preallocated size
+    if circleCountNew > maxCircles
+        % Calculate the additional space needed
+        extraSpace = circleCountNew - maxCircles;
+        
+        % Extend the preallocated matrix with zeros to accommodate the extra space
+        radiiBright = [radiiBright; zeros(extraSpace, 1)];
+        
+        % Update the maximum number of circles
+        maxCircles = maxCircles + extraSpace;
+    end
+    
+    % Add the new circle radii to the preallocated matrix
+    radiiBright(circleCount+1:circleCountNew) = tempRadiiBright;
+    circleCount = circleCountNew;
+
+
     figure()
     %% Individual photos 
     subplot(2,1,2), imshow(RawImage)
@@ -141,17 +160,28 @@ for k = 1:length(imgs)
     dim = [0.55 0.6 0.3 0.3];
     annotation('textbox',dim,'String',str,'FitBoxToText','on');
 
-    sgtitle(string(file(k))) % Title of the individual photo
+    % sgtitle(string(file(k))) % Title of the individual photo
 
-    %% TODO 
-    % Output the figure to the output file and DO NOT print
-end
+    %% Output the figure to the output file and DO NOT print
+    % Save the figure as JPG
+    figFileName = fullfile(folderPath, sprintf(string(file(k)), figCounter));
+    saveas(gcf, figFileName, 'jpg');
     
+    % Increment the figure counter
+    figCounter = figCounter + 1;
+end
+
+% Concatenates zeros if needed
+if circleCount < maxCircles
+    radiiBright = radiiBright(1:circleCount);
+end
+
+
 % The value inside of the parentheses below is the um / pixels
 DiaBrightAdj = radiiBright*(1100/410)*2; % Gives you diameter of the beads/droplets... NEED TO MAKE SURE CORRECT MULTIPLIER IS USED  
 
 figure,histogram(DiaBrightAdj) % Gives you a histogram of the data
-title('Droplet size distribution','FontSize', 14) % title of your plot
+title('Total droplet size distribution','FontSize', 14) % title of your plot
 xlabel('Diameter (um)', 'FontSize', 14) % x-axis label of your plot
 ylabel('Number of beads', 'FontSize', 14) % y-axis label of your plot 
 countDia = size(DiaBrightAdj,1); %Data that may be useful to have present
@@ -168,6 +198,10 @@ str = compose(DataInfo, A);
 dim = [0.55 0.6 0.3 0.3];
 annotation('textbox',dim,'String',str,'FitBoxToText','on');
 
+figFileName = fullfile(folderPath, 'Total Droplet Data');
+saveas(gcf, figFileName, 'jpg');
+
+toc
 
 %%% END KODY'S CHANGES %%%
 

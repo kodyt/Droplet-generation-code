@@ -34,7 +34,7 @@ SensitivityFactor = 0.94;   % The sensitivity of the circle-hunting command.  Lo
 %% TODO %%
 
 %%%%% START KODY's CHANGES %%%%%%
-startingFolder = 'C:\Program Files\MATLAB';
+startingFolder = 'C:\Program Files\MATLAB'; % Might have issues for windows
 if ~exist(startingFolder, 'dir')
   % If that folder doesn't exist, just start in the current folder.
   startingFolder = pwd;
@@ -67,10 +67,23 @@ if ischar(imgs(1))
     file = {file};
 end
 
-radiiBright = 0;
+% TODO
+% Create an output file and then clear it if it already exists
+folderPath = fullfile(pwd, 'Output-Data');
+if exist(folderPath, 'dir')
+    rmdir(folderPath, 's');
+end
+mkdir(folderPath);
+cd(folderPath); % This might be unnecessary?
+
+
+
 % radiiBright = zeros(1000000,1);
 % Preallocate and then with the counter from the temp, at the end resize
 % the radiibright -= the total number of circles found
+maxCircles = 1000000;
+radiiBright = zeros(maxCircles, 1); % Preallocation
+circleCount = 0;
 
 % Reads all of the files in the new directory
 for k = 1:length(imgs)
@@ -80,11 +93,11 @@ for k = 1:length(imgs)
     % drawnow; % Force display to update immediately.
     
     B = RawImage; % This is all your information for analysis
-    LofI = length(B); % Determining the length of the matrix, to know dimensions (normally all images are squares so one dimension is fine)
+    % LofI = length(B); % Determining the length of the matrix, to know dimensions (normally all images are squares so one dimension is fine)
     %%
     red = B(:,:,1); % Red channel data
-    green = B(:,:,2); % Green channel data
-    blue = B(:,:,3); % Blue channel data
+    % green = B(:,:,2); % Green channel data
+    % blue = B(:,:,3); % Blue channel data
     a = zeros(size(B, 1), size(B, 2)); % Makes an all zero matrix to blot out channels that are not of interest, i.e they become 0
 
     %%
@@ -93,7 +106,7 @@ for k = 1:length(imgs)
     just_red = cat(3, red, a, a);     % Creates a new set of data only composed of red channel data
     % just_green = cat(3, a, green, a); % Creates a new set of data only composed of green channel data
     % just_blue = cat(3, a, a, blue);  % Creates a new set of data only composed of blue channel data
-    back_to_original_img = cat(3, red, green, blue); % Back to your original image such that you can evaluate
+    % back_to_original_img = cat(3, red, green, blue); % Back to your original image such that you can evaluate
     
     %Preparing image analysis and output
     
@@ -102,29 +115,69 @@ for k = 1:length(imgs)
     
     [centersBright, tempRadiiBright] = imfindcircles(just_red,[SRadius LRadius],'ObjectPolarity','bright','Sensitivity',SensitivityFactor);%Algorithm that identifies the circles
     
-    % TODO 
-    % With preallocation, instead of adding to the end of the array have it
-    % just index into the section
-    % Could hold the current index of the latest value and then replace it with the tempRadiibright and then add the latest value
-    radiiBright = [radiiBright; tempRadiiBright];
     
-    % Updated plots between the time points
+    % radiiBright = [radiiBright; tempRadiiBright]; % before changes
+
+    % New circle count
+    circleCountNew = circleCount + size(tempRadiiBright, 1);
     
-    subplot(1,2,1), imshow(RawImage)
+    % Check if the number of circles exceeds the preallocated size
+    if circleCountNew > maxCircles
+        % Calculate the additional space needed
+        extraSpace = circleCountNew - maxCircles;
+        
+        % Extend the preallocated matrix with zeros to accommodate the extra space
+        radiiBright = [radiiBright; zeros(extraSpace, 1)];
+        
+        % Update the maximum number of circles
+        maxCircles = maxCircles + extraSpace;
+    end
+    
+    % Add the new circle radii to the preallocated matrix
+    radiiBright(circleCount+1:circleCountNew) = tempRadiiBright;
+    circleCount = circleCountNew;
+
+
+    figure()
+    %% Individual photos 
+    subplot(2,1,2), imshow(RawImage)
     viscircles(centersBright, tempRadiiBright,'EdgeColor','r') %places circles around your objects, should help visualize the specific beads or droplets identified
     
-    
-    DiaBrightAdj = tempRadiiBright*(1100/410)*2; % Gives you diameter of the beads/droplets... NEED TO MAKE SURE CORRECT MULTIPLIER IS USED  
-    subplot(1,2,2), histogram(DiaBrightAdj)
+    %% Individual Photo Data
+    DiaBrightAdj = tempRadiiBright*(1100/410)*2; 
+    subplot(2,1,1), histogram(DiaBrightAdj)
+    title('Droplet size distribution','FontSize', 14) 
+    xlabel('Diameter (um)', 'FontSize', 14) 
+    ylabel('Number of beads', 'FontSize', 14) 
+    countDia = size(DiaBrightAdj,1);
+    DiaMean = mean(DiaBrightAdj);    
+    DiaSTD = std(DiaBrightAdj);
+
+    A = [countDia; DiaMean; DiaSTD];
+    DataInfo = {'Samples Counted: %.3f';...
+               'Mean Diameter: %.3f';...
+               'St.Dev: %.3f'};
+    str = compose(DataInfo, A);
+    dim = [0.55 0.6 0.3 0.3];
+    annotation('textbox',dim,'String',str,'FitBoxToText','on');
 
     sgtitle(string(file(k))) % Title of the individual photo
+
+    %% TODO 
+    % Output the figure to the output file and DO NOT print
 end
-    
+
+% Concatenates zeros if needed
+if circleCount < maxCircles
+    radiiBright = radiiBright(1:circleCount);
+end
+
+
 % The value inside of the parentheses below is the um / pixels
 DiaBrightAdj = radiiBright*(1100/410)*2; % Gives you diameter of the beads/droplets... NEED TO MAKE SURE CORRECT MULTIPLIER IS USED  
 
 figure,histogram(DiaBrightAdj) % Gives you a histogram of the data
-title('Droplet size distribution','FontSize', 14) % title of your plot
+title('Total droplet size distribution','FontSize', 14) % title of your plot
 xlabel('Diameter (um)', 'FontSize', 14) % x-axis label of your plot
 ylabel('Number of beads', 'FontSize', 14) % y-axis label of your plot 
 countDia = size(DiaBrightAdj,1); %Data that may be useful to have present
